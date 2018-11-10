@@ -26,7 +26,7 @@ Total code space use is ~36% so plenty of space for more animations if wanted.
 This is a KiCad 5.0 project. 
 PCBs are also posed on OSHpark here: https://www.oshpark.com/shared_projects/GfiURq3q
 
-## mplabX
+## MplabX
 This is a mplabX 5.05 project. All programming / debug was done with a PicKit4.
 The firmware source is all contained in mad_cat_backpack_v0.asm 
 If you just want to program a backpack using mad_cat_backpack.X.production.hex in microchip IPE is the fastest way. 
