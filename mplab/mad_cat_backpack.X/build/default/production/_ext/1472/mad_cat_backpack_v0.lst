@@ -1,0 +1,2100 @@
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  1
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00001 ;#######################################################################################################
+                            ##################################################
+                      00002 ;Copyright (c) 2018 Peter Shabino
+                      00003 ;
+                      00004 ;Permission is hereby granted, free of charge, to any person obtaining a copy of this hardware, software
+                            , and associated documentation files 
+                      00005 ;(the "Product"), to deal in the Product without restriction, including without limitation the rights to
+                             use, copy, modify, merge, publish, 
+                      00006 ;distribute, sublicense, and/or sell copies of the Product, and to permit persons to whom the Product is
+                             furnished to do so, subject to the 
+                      00007 ;following conditions:
+                      00008 ;
+                      00009 ;The above copyright notice and this permission notice shall be included in all copies or substantial po
+                            rtions of the Product.
+                      00010 ;
+                      00011 ;THE PRODUCT IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LI
+                            MITED TO THE WARRANTIES OF 
+                      00012 ;MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+                             COPYRIGHT HOLDERS BE LIABLE 
+                      00013 ;FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+                             FROM, OUT OF OR IN CONNECTION 
+                      00014 ;WITH THE PRODUCT OR THE USE OR OTHER DEALINGS IN THE PRODUCT.
+                      00015 ;#######################################################################################################
+                            ##################################################
+                      00016 ; 02Nov18 V0 PJS New
+                      00017 ; 04Nov18 V1 PJS 8 base animations in with random rotations and delays. 
+                      00018     
+                      00019 #define CODE_VER_STRING "Peter Shabino 04Nov18 code for Mad Cat Backpack V1 www.wire2wire.org!" ;Just in
+                             ROM !!! update vars below with true level!!
+                      00020 
+                      00021 
+                      00022 ;****************************************************************************************
+                      00023 ; port list [SSOP28]
+                      00024 ; Vss(14)
+                      00025 ; Vdd(1)
+                      00026 ; RA0(13)       [ICSPDAT]
+                      00027 ; RA1(12)       [ICSPCLK]
+                      00028 ; RA2(11)       
+                      00029 ; RA3(4)        [#MCLR]
+                      00030 ; RA4(3)        led tooth 1 left
+                      00031 ; RA5(2)        led left eye
+                      00032 ; RC0(10)       led tooth 2
+                      00033 ; RC1(9)        led tooth 3
+                      00034 ; RC2(8)        led tooth 4
+                      00035 ; RC3(7)        led right eye
+                      00036 ; RC4(6)        led tooth 6 right
+                      00037 ; RC5(5)        led tooth 5
+                      00038 ;****************************************************************************************
+                      00039 
+                      00040         
+                      00041 ; PIC16F1503 Configuration Bit Settings
+                      00042 #include "p16f1503.inc"
+                      00001         LIST
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  2
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00002 
+                      00003 ;==========================================================================
+                      00004 ; Build date : Jul 23 2018
+                      00005 ;  MPASM PIC16F1503 processor include
+                      00006 ; 
+                      00007 ;  (c) Copyright 1999-2018 Microchip Technology, All rights reserved
+                      00008 ;==========================================================================
+                      00009 
+                      01420         LIST
+                      00043 ; CONFIG1
+                      00044 ; __config 0xFF04
+8007   3F04           00045  __CONFIG _CONFIG1, _FOSC_INTOSC & _WDTE_OFF & _PWRTE_ON & _MCLRE_OFF & _CP_ON & _BOREN_ON & _CLKOUTEN_O
+                            FF
+                      00046 ; CONFIG2
+                      00047 ; __config 0xF7FF
+8008   37FF           00048  __CONFIG _CONFIG2, _WRT_OFF & _STVREN_ON & _BORV_LO & _LPBOR_ON & _LVP_ON      
+                      00049  
+                      00050  
+                      00051  
+                      00052 ;------------------
+                      00053 ; constants
+                      00054 ;------------------     
+  0000007D            00055 PWM_DELAY               equ 0x7D
+                      00056         
+                      00057 ;------------------
+                      00058 ; vars (0x20 - 0x6f) bank 0
+                      00059 ;------------------
+  00000020            00060 right_eye               equ 0x20
+  00000021            00061 left_eye                equ 0x21
+  00000022            00062 tooth1                  equ 0x22
+  00000023            00063 tooth2                  equ 0x23
+  00000024            00064 tooth3                  equ 0x24
+  00000025            00065 tooth4                  equ 0x25
+  00000026            00066 tooth5                  equ 0x26
+  00000027            00067 tooth6                  equ 0x27
+  00000028            00068 pwm_cnt                 equ     0x28
+  00000029            00069 delay_l                 equ 0x29
+  0000002A            00070 delay_h                 equ     0x2A
+  0000002B            00071 counter1                equ 0x2B
+  0000002C            00072 temp                    equ 0x2C
+  0000002D            00073 LFSR_0                  equ     0x2D                    
+  0000002E            00074 LFSR_1                  equ     0x2E                    
+  0000002F            00075 LFSR_2                  equ     0x2F                    
+  00000030            00076 LFSR_3                  equ     0x30    
+  00000031            00077 LFSR_count              equ 0x31
+  00000032            00078 counter2                equ 0x32
+                      00079  
+                      00080  
+                      00081 ;------------------
+                      00082 ; vars (0x70 - 0x7F) global regs
+                      00083 ;------------------
+                      00084 
+                      00085 
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  3
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00086  
+                      00087 ;put the following at address 0000h
+                      00088         org     0000h
+0000   2???           00089         goto    START                       ;vector to initialization sequence
+                      00090 
+                      00091 ;put the following at address 0004h
+                      00092         org     0004h
+0004   018A           00093         clrf    PCLATH                          ; this MUST be cleared before the IRQ goto else will jum
+                            p to god knows where. 
+0005   2???           00094         goto    IRQ                         
+                      00095 
+                      00096 ; stuff in the  code description at the top of the code. 
+0006   0050 0065 0074 00097         de      CODE_VER_STRING
+       0065 0072 0020 
+       0053 0068 0061 
+       0062 0069 006E 
+       006F 0020 0030 
+       0034 004E 006F 
+       0076 0031 0038 
+       0020 0063 006F 
+       0064 0065 0020 
+       0066 006F 0072 
+       0020 004D 0061 
+       0064 0020 0043 
+       0061 0074 0020 
+       0042 0061 0063 
+       006B 0070 0061 
+       0063 006B 0020 
+       0056 003
+                      00098         
+                      00099 ;#######################################################################################################
+                            ####################
+                      00100 ; intrupt routine
+                      00101 ;#######################################################################################################
+                            ####################
+004B                  00102 IRQ             
+                      00103         ; following regs are autosaved
+                      00104         ; W
+                      00105         ; STATUS (except TO and PD)
+                      00106         ; BSR
+                      00107         ; FSR
+                      00108         ; PCLATH
+                      00109         
+                      00110         
+                      00111         ;------------------
+004B   0188           00112         clrf    BSR                         ; bank 0
+                      00113         ;------------------
+004C   1D0B           00114         btfss   INTCON, TMR0IF
+004D   2???           00115         goto    IRQ_not_tmr0
+                      00116         
+                      00117         ; update PWM timer
+004E   0AA8           00118         incf    pwm_cnt, F
+004F   1D03           00119         btfss   STATUS, Z
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  4
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0050   2???           00120         goto    IRQ_tmr0_pwm_not_zero
+0051   0821           00121         movf    left_eye, W
+0052   1D03           00122         btfss   STATUS, Z
+0053   128C           00123         bcf             PORTA, 5
+0054   0820           00124         movf    right_eye, W
+0055   1D03           00125         btfss   STATUS, Z
+0056   118E           00126         bcf             PORTC, 3
+0057   0822           00127         movf    tooth1, W
+0058   1D03           00128         btfss   STATUS, Z
+0059   120C           00129         bcf             PORTA, 4
+005A   0823           00130         movf    tooth2, W
+005B   1D03           00131         btfss   STATUS, Z
+005C   100E           00132         bcf             PORTC, 0
+005D   0824           00133         movf    tooth3, W
+005E   1D03           00134         btfss   STATUS, Z
+005F   108E           00135         bcf             PORTC, 1
+0060   0825           00136         movf    tooth4, W
+0061   1D03           00137         btfss   STATUS, Z
+0062   110E           00138         bcf             PORTC, 2
+0063   0826           00139         movf    tooth5, W
+0064   1D03           00140         btfss   STATUS, Z
+0065   128E           00141         bcf             PORTC, 5
+0066   0827           00142         movf    tooth6, W
+0067   1D03           00143         btfss   STATUS, Z
+0068   120E           00144         bcf             PORTC, 4        
+0069   2???           00145         goto    IRQ_tmr0_done
+                      00146         
+006A                  00147 IRQ_tmr0_pwm_not_zero   
+006A   0828           00148         movf    pwm_cnt, W
+006B   0221           00149         subwf   left_eye, W
+006C   1C03           00150         btfss   STATUS, C
+006D   168C           00151         bsf             PORTA, 5
+006E   0828           00152         movf    pwm_cnt, W
+006F   0220           00153         subwf   right_eye, W
+0070   1C03           00154         btfss   STATUS, C
+0071   158E           00155         bsf             PORTC, 3
+0072   0828           00156         movf    pwm_cnt, W
+0073   0222           00157         subwf   tooth1, W
+0074   1C03           00158         btfss   STATUS, C
+0075   160C           00159         bsf             PORTA, 4
+0076   0828           00160         movf    pwm_cnt, W
+0077   0223           00161         subwf   tooth2, W
+0078   1C03           00162         btfss   STATUS, C
+0079   140E           00163         bsf             PORTC, 0
+007A   0828           00164         movf    pwm_cnt, W
+007B   0224           00165         subwf   tooth3, W
+007C   1C03           00166         btfss   STATUS, C
+007D   148E           00167         bsf             PORTC, 1
+007E   0828           00168         movf    pwm_cnt, W
+007F   0225           00169         subwf   tooth4, W
+0080   1C03           00170         btfss   STATUS, C
+0081   150E           00171         bsf             PORTC, 2
+0082   0828           00172         movf    pwm_cnt, W
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  5
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0083   0226           00173         subwf   tooth5, W
+0084   1C03           00174         btfss   STATUS, C
+0085   168E           00175         bsf             PORTC, 5
+0086   0828           00176         movf    pwm_cnt, W
+0087   0227           00177         subwf   tooth6, W
+0088   1C03           00178         btfss   STATUS, C
+0089   160E           00179         bsf             PORTC, 4        
+                      00180         
+008A                  00181 IRQ_tmr0_done   
+008A   307D           00182         movlw   PWM_DELAY               ; prime timer 0 with inital value
+008B   0095           00183         movwf   TMR0
+008C   110B           00184         bcf             INTCON, TMR0IF  
+008D                  00185 IRQ_not_tmr0
+                      00186         
+                      00187         
+008D   1C11           00188         btfss   PIR1, TMR1IF
+008E   2???           00189         goto    IRQ_not_tmr1
+008F   1011           00190         bcf             PIR1, TMR1IF
+                      00191 
+                      00192         ; check if delay is already 0
+0090   0829           00193         movf    delay_l, W
+0091   1D03           00194         btfss   STATUS,Z
+0092   2???           00195         goto    IRQ_tmr1_not_zero
+0093   082A           00196         movf    delay_h, W
+0094   1903           00197         btfsc   STATUS,Z
+0095   2???           00198         goto    IRQ_not_tmr1
+0096                  00199 IRQ_tmr1_not_zero       
+                      00200         ; subtract 1
+0096   3001           00201         movlw   0x01
+0097   02A9           00202         subwf   delay_l, F
+0098   1C03           00203         btfss   STATUS, C
+0099   03AA           00204         decf    delay_h, F
+009A                  00205 IRQ_not_tmr1
+                      00206         
+009A   0009           00207         retfie
+                      00208 ;#######################################################################################################
+                            ####################
+                      00209 ; end of IRQ code
+                      00210 ;#######################################################################################################
+                            ####################    
+                      00211         
+009B                  00212 START
+                      00213         ; init crap
+                      00214         ;------------------
+009B   0188           00215         clrf    BSR                         ; bank 0
+                      00216         ;------------------
+009C   018B           00217         clrf    INTCON                  ; disable interupts
+                      00218         
+                      00219         ; init timers
+009D   307D           00220         movlw   PWM_DELAY               ; prime timer 0 with inital value
+009E   0095           00221         movwf   TMR0
+009F   0199           00222         clrf    T1GCON                  ; disable timer 1 gate control
+00A0   1011           00223         bcf             PIR1, TMR1IF    ; clear interrupt
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  6
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00A1   3031           00224         movlw   0x31                    ; timer1 Fosc/4, 1:8 pre, on
+00A2   0098           00225         movwf   T1CON
+00A3   30FF           00226         movlw   0xFF
+00A4   009B           00227         movwf   PR2
+00A5   303E           00228         movlw   0x3E                    ; timer 2 on, 1:8 post, 1:16 pre scaler
+00A6   009C           00229         movwf   T2CON
+00A7   019A           00230         clrf    TMR2
+                      00231         
+                      00232         ; init LFSR
+00A8   3055           00233         movlw   0x55
+00A9   00AD           00234         movwf   LFSR_0
+00AA   00AE           00235         movwf   LFSR_1
+00AB   00AF           00236         movwf   LFSR_2
+00AC   00B0           00237         movwf   LFSR_3  
+                      00238 
+                      00239         ; init leds
+00AD   01A0           00240         clrf    right_eye
+00AE   01A1           00241         clrf    left_eye
+00AF   01A2           00242         clrf    tooth1
+00B0   01A3           00243         clrf    tooth2
+00B1   01A4           00244         clrf    tooth3
+00B2   01A5           00245         clrf    tooth4
+00B3   01A6           00246         clrf    tooth5
+00B4   01A7           00247         clrf    tooth6
+                      00248         
+                      00249         ;------------------
+00B5   3003           00250         movlw   d'3'
+00B6   0088           00251         movwf   BSR             
+                      00252         ;------------------
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00B7   018C           00253         clrf    ANSELA
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00B8   018E           00254         clrf    ANSELC
+                      00255 
+                      00256         ;------------------
+00B9   3002           00257         movlw   d'2'
+00BA   0088           00258         movwf   BSR             
+                      00259         ;------------------
+00BB   3030           00260         movlw   0x30
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00BC   008C           00261         movwf   LATA
+00BD   303F           00262         movlw   0x3F
+00BE   3000           00263         movlw   0x00
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00BF   008E           00264         movwf   LATC
+                      00265 
+                      00266         ;------------------
+00C0   3001           00267         movlw   d'1'
+00C1   0088           00268         movwf   BSR             
+                      00269         ;------------------
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00C2   018C           00270         clrf    LATA                        ; 0 = output
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  7
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00C3   018E           00271         clrf    LATC    
+00C4   3078           00272         movlw   0x78
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00C5   0099           00273         movwf   OSCCON
+00C6   30D8           00274         movlw   0xD8                            ; timer 0 internal clock, prescaler to timer 0, 2 divide
+                            r
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00C7   0095           00275         movwf   OPTION_REG
+Message[302]: Register in operand not in bank 0.  Ensure that bank bits are correct.
+00C8   1411           00276         bsf             PIE1, TMR1IE            ; enable timer 1 interrupt
+                      00277         
+                      00278         ;------------------
+00C9   0188           00279         clrf    BSR                                     ; bank 0
+                      00280         ;------------------
+00CA   30E0           00281         movlw   0xE0                            ; global, PE, and Timer 0 on
+00CB   008B           00282         movwf   INTCON                      ; enable interrupts
+                      00283 
+                      00284         
+00CC   2???           00285         goto    START_ANIMATION
+                      00286         
+                      00287 ;-------------------------------------------------------------------------------------------------------
+                            -------------------------------------------     
+00CD                  00288 MAINLOOP
+                      00289         
+                      00290         ; delay between animation seq (all LEDs on)
+00CD   2???           00291         call    _CYCLE_LFSR     
+00CE   00A9           00292         movwf   delay_l 
+00CF                  00293 mainloop_delay
+00CF   0829           00294         movf    delay_l, W
+00D0   1D03           00295         btfss   STATUS, Z
+00D1   2???           00296         goto    mainloop_delay
+                      00297 
+                      00298         
+00D2   2???           00299         call    _CYCLE_LFSR     
+00D3   391F           00300         andlw   0x1F
+00D4   000B           00301         brw 
+00D5   2???           00302         goto    animation_smile_in_out
+00D6   2???           00303         goto    animation_blink
+00D7   2???           00304         goto    animation_lip_lick_right
+00D8   2???           00305         goto    animation_lip_lick_left
+00D9   2???           00306         goto    animation_lip_piano
+00DA   2???           00307         goto    animation_eye_bobble
+00DB   2???           00308         goto    animation_talk
+00DC   2???           00309         goto    animation_sparkles
+                      00310 
+00DD   2???           00311         goto    animation_blink
+00DE   2???           00312         goto    animation_blink 
+00DF   2???           00313         goto    animation_smile_in_out
+00E0   2???           00314         goto    animation_lip_lick_right
+                      00315         
+00E1   2???           00316         goto    animation_lip_lick_left
+00E2   2???           00317         goto    animation_lip_piano
+00E3   2???           00318         goto    animation_eye_bobble
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  8
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+00E4   2???           00319         goto    animation_talk
+                      00320 
+00E5   2???           00321         goto    animation_blink
+00E6   2???           00322         goto    animation_blink
+00E7   2???           00323         goto    animation_blink
+00E8   2???           00324         goto    animation_blink
+                      00325 
+00E9   2???           00326         goto    animation_lip_lick_right
+00EA   2???           00327         goto    animation_lip_lick_left
+00EB   2???           00328         goto    animation_eye_bobble
+00EC   2???           00329         goto    animation_blink
+                      00330         
+                      00331         
+00ED   2???           00332         goto    animation_blink
+00EE   2???           00333         goto    animation_blink 
+00EF   2???           00334         goto    animation_smile_in_out
+00F0   2???           00335         goto    animation_lip_lick_right
+                      00336         
+00F1   2???           00337         goto    animation_lip_lick_left
+00F2   2???           00338         goto    animation_lip_piano
+00F3   2???           00339         goto    animation_eye_bobble
+00F4   2???           00340         goto    animation_talk
+                      00341         
+                      00342         
+00F5   2???           00343         goto    MAINLOOP
+                      00344 
+                      00345 
+                      00346 ;-----------------------------------------
+00F6                  00347 animation_sparkles
+                      00348 ;-----------------------------------------
+                      00349         
+00F6   2???           00350         call    _CYCLE_LFSR     
+00F7   00B2           00351         movwf   counter2
+                      00352 
+00F8                  00353 sparkles_loop
+00F8   2???           00354         call    _CYCLE_LFSR     
+00F9   2???           00355         call    _pwm_values
+00FA   00A2           00356         movwf   tooth1
+00FB   2???           00357         call    _CYCLE_LFSR     
+00FC   2???           00358         call    _pwm_values
+00FD   00A3           00359         movwf   tooth2
+00FE   2???           00360         call    _CYCLE_LFSR     
+00FF   2???           00361         call    _pwm_values
+0100   00A4           00362         movwf   tooth3
+0101   2???           00363         call    _CYCLE_LFSR     
+0102   2???           00364         call    _pwm_values
+0103   00A5           00365         movwf   tooth4
+0104   2???           00366         call    _CYCLE_LFSR     
+0105   2???           00367         call    _pwm_values
+0106   00A6           00368         movwf   tooth5
+0107   2???           00369         call    _CYCLE_LFSR     
+0108   2???           00370         call    _pwm_values
+0109   00A7           00371         movwf   tooth6
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE  9
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+010A   2???           00372         call    _CYCLE_LFSR     
+010B   2???           00373         call    _pwm_values
+010C   00A1           00374         movwf   left_eye
+010D   2???           00375         call    _CYCLE_LFSR     
+010E   2???           00376         call    _pwm_values
+010F   00A0           00377         movwf   right_eye
+                      00378 
+0110   2???           00379         call    _CYCLE_LFSR     
+0111   3907           00380         andlw   0x07
+0112   1903           00381         btfsc   STATUS, Z
+0113   3001           00382         movlw   0x01    
+0114   2???           00383         call    _delay  
+                      00384         
+                      00385         
+0115   0BB2           00386         decfsz  counter2, F
+0116   2???           00387         goto    sparkles_loop
+                      00388         
+0117   30FF           00389         movlw   0xFF
+0118   00A2           00390         movwf   tooth1
+0119   00A3           00391         movwf   tooth2
+011A   00A4           00392         movwf   tooth3
+011B   00A5           00393         movwf   tooth4
+011C   00A6           00394         movwf   tooth5
+011D   00A7           00395         movwf   tooth6
+011E   00A1           00396         movwf   left_eye
+011F   00A0           00397         movwf   right_eye
+                      00398         
+0120   2???           00399         goto    MAINLOOP        
+                      00400 ;-----------------------------------------
+0121                  00401 animation_talk
+                      00402 ;-----------------------------------------
+                      00403 #define talk_delay 0x03
+                      00404         
+0121   2???           00405         call    _CYCLE_LFSR     
+0122   3907           00406         andlw   0x07
+0123   3801           00407         iorlw   0x01
+0124   00B2           00408         movwf   counter2
+                      00409                 
+0125                  00410 talk_loop
+0125   300F           00411         movlw   0x0F
+0126   00AB           00412         movwf   counter1
+0127                  00413 talk_loop1
+0127   082B           00414         movf    counter1, W
+0128   2???           00415         call    _pwm_values
+0129   00A2           00416         movwf   tooth1
+012A   00A7           00417         movwf   tooth6  
+012B   2???           00418         call    _CYCLE_LFSR     
+012C   3903           00419         andlw   talk_delay
+012D   1903           00420         btfsc   STATUS, Z
+012E   3001           00421         movlw   0x01    
+012F   2???           00422         call    _delay
+0130   03AB           00423         decf    counter1, F
+0131   082B           00424         movf    counter1, W
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 10
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0132   3A07           00425         xorlw   0x07
+0133   1D03           00426         btfss   STATUS, Z
+0134   2???           00427         goto    talk_loop1
+                      00428         
+                      00429         
+0135                  00430 talk_loop2
+0135   082B           00431         movf    counter1, W
+0136   2???           00432         call    _pwm_values
+0137   00A2           00433         movwf   tooth1
+0138   00A7           00434         movwf   tooth6  
+0139   082B           00435         movf    counter1, W
+013A   3E08           00436         addlw   0x08
+013B   2???           00437         call    _pwm_values
+013C   00A3           00438         movwf   tooth2
+013D   00A6           00439         movwf   tooth5  
+013E   2???           00440         call    _CYCLE_LFSR     
+013F   3903           00441         andlw   talk_delay
+0140   1903           00442         btfsc   STATUS, Z
+0141   3001           00443         movlw   0x01
+0142   2???           00444         call    _delay
+0143   0BAB           00445         decfsz  counter1, F
+0144   2???           00446         goto    talk_loop2
+0145   01A2           00447         clrf    tooth1
+0146   01A7           00448         clrf    tooth6
+                      00449 
+0147   3008           00450         movlw   0x08
+0148   00AB           00451         movwf   counter1        
+0149                  00452 talk_loop3
+0149   082B           00453         movf    counter1, W
+014A   2???           00454         call    _pwm_values
+014B   00A3           00455         movwf   tooth2
+014C   00A6           00456         movwf   tooth5  
+014D   2???           00457         call    _CYCLE_LFSR     
+014E   3903           00458         andlw   talk_delay
+014F   1903           00459         btfsc   STATUS, Z
+0150   3001           00460         movlw   0x01
+0151   2???           00461         call    _delay
+0152   0BAB           00462         decfsz  counter1, F
+0153   2???           00463         goto    talk_loop3
+                      00464         
+0154                  00465 talk_loop4
+0154   082B           00466         movf    counter1, W
+0155   2???           00467         call    _pwm_values
+0156   00A3           00468         movwf   tooth2
+0157   00A6           00469         movwf   tooth5  
+0158   2???           00470         call    _CYCLE_LFSR     
+0159   3903           00471         andlw   talk_delay
+015A   1903           00472         btfsc   STATUS, Z
+015B   3001           00473         movlw   0x01
+015C   2???           00474         call    _delay
+015D   0AAB           00475         incf    counter1, F
+015E   082B           00476         movf    counter1, W
+015F   3A09           00477         xorlw   0x09
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 11
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0160   1D03           00478         btfss   STATUS, Z
+0161   2???           00479         goto    talk_loop4
+                      00480         
+0162                  00481 talk_loop5
+0162   082B           00482         movf    counter1, W
+0163   2???           00483         call    _pwm_values
+0164   00A3           00484         movwf   tooth2
+0165   00A6           00485         movwf   tooth5  
+0166   3008           00486         movlw   0x08
+0167   022B           00487         subwf   counter1, W
+0168   2???           00488         call    _pwm_values
+0169   00A2           00489         movwf   tooth1
+016A   00A7           00490         movwf   tooth6  
+016B   2???           00491         call    _CYCLE_LFSR     
+016C   3903           00492         andlw   talk_delay
+016D   1903           00493         btfsc   STATUS, Z
+016E   3001           00494         movlw   0x01
+016F   2???           00495         call    _delay
+0170   0AAB           00496         incf    counter1, F
+0171   082B           00497         movf    counter1, W
+0172   3A0F           00498         xorlw   0x0F
+0173   1D03           00499         btfss   STATUS, Z
+0174   2???           00500         goto    talk_loop5
+0175   30FF           00501         movlw   0xFF
+0176   00A3           00502         movwf   tooth2
+0177   00A6           00503         movwf   tooth5
+                      00504         
+0178   3008           00505         movlw   0x08
+0179   00AB           00506         movwf   counter1
+017A                  00507 talk_loop6
+017A   082B           00508         movf    counter1, W
+017B   2???           00509         call    _pwm_values
+017C   00A2           00510         movwf   tooth1
+017D   00A7           00511         movwf   tooth6  
+017E   2???           00512         call    _CYCLE_LFSR     
+017F   3903           00513         andlw   talk_delay
+0180   1903           00514         btfsc   STATUS, Z
+0181   3001           00515         movlw   0x01
+0182   2???           00516         call    _delay
+0183   0AAB           00517         incf    counter1, F
+0184   082B           00518         movf    counter1, W
+0185   3A0F           00519         xorlw   0x0F
+0186   1D03           00520         btfss   STATUS, Z
+0187   2???           00521         goto    talk_loop6
+0188   30FF           00522         movlw   0xFF
+0189   00A2           00523         movwf   tooth1
+018A   00A7           00524         movwf   tooth6
+                      00525         
+018B   0BB2           00526         decfsz  counter2, F
+018C   2???           00527         goto    talk_loop
+                      00528         
+018D   2???           00529         goto    MAINLOOP                
+                      00530         
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 12
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00531 ;-----------------------------------------
+018E                  00532 animation_eye_bobble
+                      00533 ;-----------------------------------------
+                      00534         
+018E   2???           00535         call    _CYCLE_LFSR     
+018F   3907           00536         andlw   0x07
+0190   3801           00537         iorlw   0x01
+0191   00B2           00538         movwf   counter2
+                      00539                 
+0192                  00540 eye_bobble_loop 
+0192   300F           00541         movlw   0x0F
+0193   00AB           00542         movwf   counter1        
+0194                  00543 eye_bobble_loop1
+0194   082B           00544         movf    counter1, W
+0195   2???           00545         call    _pwm_values
+0196   00A1           00546         movwf   left_eye
+0197   3001           00547         movlw   0x01
+0198   2???           00548         call    _delay
+0199   0BAB           00549         decfsz  counter1, F
+019A   2???           00550         goto    eye_bobble_loop1        
+                      00551         
+019B   30F0           00552         movlw   0xF0
+019C   00AB           00553         movwf   counter1        
+019D                  00554 eye_bobble_loop2
+019D   082B           00555         movf    counter1, W
+019E   2???           00556         call    _pwm_values
+019F   00A1           00557         movwf   left_eye
+01A0   3001           00558         movlw   0x01
+01A1   2???           00559         call    _delay
+01A2   0FAB           00560         incfsz  counter1, F
+01A3   2???           00561         goto    eye_bobble_loop2
+                      00562 
+01A4   300F           00563         movlw   0x0F
+01A5   00AB           00564         movwf   counter1        
+01A6                  00565 eye_bobble_loop3        
+01A6   082B           00566         movf    counter1, W
+01A7   2???           00567         call    _pwm_values
+01A8   00A0           00568         movwf   right_eye
+01A9   3001           00569         movlw   0x01
+01AA   2???           00570         call    _delay
+01AB   0BAB           00571         decfsz  counter1, F
+01AC   2???           00572         goto    eye_bobble_loop3
+                      00573         
+01AD   30F0           00574         movlw   0xF0
+01AE   00AB           00575         movwf   counter1        
+01AF                  00576 eye_bobble_loop4
+01AF   082B           00577         movf    counter1, W
+01B0   2???           00578         call    _pwm_values
+01B1   00A0           00579         movwf   right_eye
+01B2   3001           00580         movlw   0x01
+01B3   2???           00581         call    _delay
+01B4   0FAB           00582         incfsz  counter1, F
+01B5   2???           00583         goto    eye_bobble_loop4
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 13
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+                      00584         
+01B6   0BB2           00585         decfsz  counter2, F
+01B7   2???           00586         goto    eye_bobble_loop
+                      00587         
+                      00588         
+01B8   2???           00589         goto    MAINLOOP                
+                      00590         
+                      00591 ;-----------------------------------------
+01B9                  00592 animation_lip_piano
+                      00593 ;-----------------------------------------
+                      00594         
+01B9   2???           00595         call    _CYCLE_LFSR     
+01BA   3907           00596         andlw   0x07
+01BB   3801           00597         iorlw   0x01
+01BC   00B2           00598         movwf   counter2
+                      00599         
+01BD   300F           00600         movlw   0x0F
+01BE   00AB           00601         movwf   counter1        
+01BF                  00602 piano_out_loop
+01BF   082B           00603         movf    counter1, W
+01C0   2???           00604         call    _pwm_values
+01C1   00A6           00605         movwf   tooth5
+01C2   3001           00606         movlw   0x01
+01C3   2???           00607         call    _delay
+01C4   0BAB           00608         decfsz  counter1, F
+01C5   2???           00609         goto    piano_out_loop
+                      00610         
+01C6   30F0           00611         movlw   0xF0
+01C7   00AB           00612         movwf   counter1        
+01C8                  00613 piano_in_loop
+01C8   082B           00614         movf    counter1, W
+01C9   2???           00615         call    _pwm_values
+01CA   00A6           00616         movwf   tooth5
+01CB   3001           00617         movlw   0x01
+01CC   2???           00618         call    _delay
+01CD   0FAB           00619         incfsz  counter1, F
+01CE   2???           00620         goto    piano_in_loop
+                      00621         
+01CF                  00622 piano_loop      
+01CF   300F           00623         movlw   0x0F
+01D0   00AB           00624         movwf   counter1        
+01D1                  00625 piano_out_loop1 
+01D1   082B           00626         movf    counter1, W
+01D2   2???           00627         call    _pwm_values
+01D3   00A3           00628         movwf   tooth2
+01D4   00A5           00629         movwf   tooth4
+01D5   00A7           00630         movwf   tooth6
+01D6   3001           00631         movlw   0x01
+01D7   2???           00632         call    _delay
+01D8   0BAB           00633         decfsz  counter1, F
+01D9   2???           00634         goto    piano_out_loop1 
+                      00635         
+01DA   30F0           00636         movlw   0xF0
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 14
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+01DB   00AB           00637         movwf   counter1        
+01DC                  00638 piano_in_loop1
+01DC   082B           00639         movf    counter1, W
+01DD   2???           00640         call    _pwm_values
+01DE   00A3           00641         movwf   tooth2
+01DF   00A5           00642         movwf   tooth4
+01E0   00A7           00643         movwf   tooth6
+01E1   3001           00644         movlw   0x01
+01E2   2???           00645         call    _delay
+01E3   0FAB           00646         incfsz  counter1, F
+01E4   2???           00647         goto    piano_in_loop1
+                      00648 
+01E5   300F           00649         movlw   0x0F
+01E6   00AB           00650         movwf   counter1        
+01E7                  00651 piano_out_loop2 
+01E7   082B           00652         movf    counter1, W
+01E8   2???           00653         call    _pwm_values
+01E9   00A2           00654         movwf   tooth1
+01EA   00A4           00655         movwf   tooth3
+01EB   00A6           00656         movwf   tooth5
+01EC   3001           00657         movlw   0x01
+01ED   2???           00658         call    _delay
+01EE   0BAB           00659         decfsz  counter1, F
+01EF   2???           00660         goto    piano_out_loop2
+                      00661         
+01F0   30F0           00662         movlw   0xF0
+01F1   00AB           00663         movwf   counter1        
+01F2                  00664 piano_in_loop2
+01F2   082B           00665         movf    counter1, W
+01F3   2???           00666         call    _pwm_values
+01F4   00A2           00667         movwf   tooth1
+01F5   00A4           00668         movwf   tooth3
+01F6   00A6           00669         movwf   tooth5
+01F7   3001           00670         movlw   0x01
+01F8   2???           00671         call    _delay
+01F9   0FAB           00672         incfsz  counter1, F
+01FA   2???           00673         goto    piano_in_loop2
+                      00674         
+01FB   0BB2           00675         decfsz  counter2, F
+01FC   2???           00676         goto    piano_loop
+                      00677         
+                      00678         
+01FD   2???           00679         goto    MAINLOOP        
+                      00680 
+                      00681         
+                      00682 ;-----------------------------------------
+01FE                  00683 animation_lip_lick_left
+                      00684 ;-----------------------------------------
+                      00685         
+01FE   3020           00686         movlw   0x20
+01FF   00A7           00687         movwf   tooth6
+                      00688 
+0200   3008           00689         movlw   0x08
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 15
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0201   2???           00690         call    _delay
+                      00691 
+0202   30FF           00692         movlw   0xFF
+0203   00A7           00693         movwf   tooth6
+0204   3020           00694         movlw   0x20
+0205   00A6           00695         movwf   tooth5
+                      00696 
+0206   3008           00697         movlw   0x08
+0207   2???           00698         call    _delay
+                      00699 
+0208   30FF           00700         movlw   0xFF
+0209   00A6           00701         movwf   tooth5
+020A   3020           00702         movlw   0x20
+020B   00A5           00703         movwf   tooth4
+                      00704 
+020C   3008           00705         movlw   0x08
+020D   2???           00706         call    _delay
+                      00707 
+020E   30FF           00708         movlw   0xFF
+020F   00A5           00709         movwf   tooth4
+0210   3020           00710         movlw   0x20
+0211   00A4           00711         movwf   tooth3
+                      00712 
+0212   3008           00713         movlw   0x08
+0213   2???           00714         call    _delay
+                      00715 
+0214   30FF           00716         movlw   0xFF
+0215   00A4           00717         movwf   tooth3
+0216   3020           00718         movlw   0x20
+0217   00A3           00719         movwf   tooth2
+                      00720 
+0218   3008           00721         movlw   0x08
+0219   2???           00722         call    _delay
+                      00723 
+021A   30FF           00724         movlw   0xFF
+021B   00A3           00725         movwf   tooth2
+021C   3020           00726         movlw   0x20
+021D   00A2           00727         movwf   tooth1
+                      00728 
+021E   3008           00729         movlw   0x08
+021F   2???           00730         call    _delay
+                      00731 
+0220   30FF           00732         movlw   0xFF
+0221   00A2           00733         movwf   tooth1
+                      00734         
+0222   2???           00735         goto    MAINLOOP        
+                      00736         
+                      00737         
+                      00738 ;-----------------------------------------
+0223                  00739 animation_lip_lick_right
+                      00740 ;-----------------------------------------
+                      00741         
+0223   3020           00742         movlw   0x20
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 16
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0224   00A2           00743         movwf   tooth1
+                      00744 
+0225   3008           00745         movlw   0x08
+0226   2???           00746         call    _delay
+                      00747 
+0227   30FF           00748         movlw   0xFF
+0228   00A2           00749         movwf   tooth1
+0229   3020           00750         movlw   0x20
+022A   00A3           00751         movwf   tooth2
+                      00752 
+022B   3008           00753         movlw   0x08
+022C   2???           00754         call    _delay
+                      00755 
+022D   30FF           00756         movlw   0xFF
+022E   00A3           00757         movwf   tooth2
+022F   3020           00758         movlw   0x20
+0230   00A4           00759         movwf   tooth3
+                      00760 
+0231   3008           00761         movlw   0x08
+0232   2???           00762         call    _delay
+                      00763 
+0233   30FF           00764         movlw   0xFF
+0234   00A4           00765         movwf   tooth3
+0235   3020           00766         movlw   0x20
+0236   00A5           00767         movwf   tooth4
+                      00768 
+0237   3008           00769         movlw   0x08
+0238   2???           00770         call    _delay
+                      00771 
+0239   30FF           00772         movlw   0xFF
+023A   00A5           00773         movwf   tooth4
+023B   3020           00774         movlw   0x20
+023C   00A6           00775         movwf   tooth5
+                      00776 
+023D   3008           00777         movlw   0x08
+023E   2???           00778         call    _delay
+                      00779 
+023F   30FF           00780         movlw   0xFF
+0240   00A6           00781         movwf   tooth5
+0241   3020           00782         movlw   0x20
+0242   00A7           00783         movwf   tooth6
+                      00784 
+0243   3008           00785         movlw   0x08
+0244   2???           00786         call    _delay
+                      00787 
+0245   30FF           00788         movlw   0xFF
+0246   00A7           00789         movwf   tooth6
+                      00790         
+0247   2???           00791         goto    MAINLOOP        
+                      00792         
+                      00793 ;-----------------------------------------
+0248                  00794 animation_blink
+                      00795 ;-----------------------------------------
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 17
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0248   1C2F           00796         btfss   LFSR_2,0
+0249   01A1           00797         clrf    left_eye
+024A   1CAF           00798         btfss   LFSR_2,1
+024B   01A0           00799         clrf    right_eye
+                      00800 
+                      00801         ; if no eye is off blink both
+024C   1C2F           00802         btfss   LFSR_2,0
+024D   2???           00803         goto    blink_ok
+024E   1CAF           00804         btfss   LFSR_2,1
+024F   2???           00805         goto    blink_ok
+0250   01A1           00806         clrf    left_eye
+0251   01A0           00807         clrf    right_eye
+                      00808         
+0252                  00809 blink_ok
+                      00810         ; blink lenght
+0252   2???           00811         call    _CYCLE_LFSR     
+0253   397F           00812         andlw   0x7F
+0254   3803           00813         iorlw   0x03
+0255   2???           00814         call    _delay
+                      00815         
+0256   30FF           00816         movlw   0xFF
+0257   00A1           00817         movwf   left_eye
+0258   00A0           00818         movwf   right_eye
+                      00819         
+0259   2???           00820         goto    MAINLOOP
+                      00821         
+                      00822 ;-----------------------------------------
+025A                  00823 animation_smile_in_out  
+                      00824 ;-----------------------------------------
+025A   300F           00825         movlw   0x0F
+025B   00AB           00826         movwf   counter1        
+025C                  00827 eye_out_loop    
+025C   082B           00828         movf    counter1, W
+025D   2???           00829         call    _pwm_values
+025E   00A1           00830         movwf   left_eye
+025F   00A0           00831         movwf   right_eye
+0260   3007           00832         movlw   0x07
+0261   2???           00833         call    _delay
+0262   0BAB           00834         decfsz  counter1, F
+0263   2???           00835         goto    eye_out_loop    
+0264   01A1           00836         clrf    left_eye
+0265   01A0           00837         clrf    right_eye
+                      00838         
+                      00839         ; delay between eyes off and smile off
+0266   2???           00840         call    _CYCLE_LFSR     
+0267   393F           00841         andlw   0x3F
+0268   3801           00842         iorlw   0x01
+0269   00A9           00843         movwf   delay_l 
+026A                  00844 eye_out_loop1
+026A   0829           00845         movf    delay_l, W
+026B   1D03           00846         btfss   STATUS, Z
+026C   2???           00847         goto    eye_out_loop1
+                      00848         
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 18
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+026D   300F           00849         movlw   0x0F
+026E   00AB           00850         movwf   counter1        
+026F                  00851 smile_out_loop  
+026F   082B           00852         movf    counter1, W
+0270   2???           00853         call    _pwm_values
+0271   00A2           00854         movwf   tooth1
+0272   00A3           00855         movwf   tooth2
+0273   00A4           00856         movwf   tooth3
+0274   00A5           00857         movwf   tooth4
+0275   00A6           00858         movwf   tooth5
+0276   00A7           00859         movwf   tooth6
+0277   3007           00860         movlw   0x07
+0278   2???           00861         call    _delay
+0279   0BAB           00862         decfsz  counter1, F
+027A   2???           00863         goto    smile_out_loop
+027B   01A2           00864         clrf    tooth1
+027C   01A3           00865         clrf    tooth2
+027D   01A4           00866         clrf    tooth3
+027E   01A5           00867         clrf    tooth4
+027F   01A6           00868         clrf    tooth5
+0280   01A7           00869         clrf    tooth6
+                      00870         
+                      00871         ; Delay in all off state
+0281   2???           00872         call    _CYCLE_LFSR     
+0282   3810           00873         iorlw   0x10
+0283   00A9           00874         movwf   delay_l 
+0284                  00875 smile_out_loop1
+0284   0829           00876         movf    delay_l, W
+0285   1D03           00877         btfss   STATUS, Z
+0286   2???           00878         goto    smile_out_loop1
+                      00879 
+0287                  00880 START_ANIMATION 
+                      00881         
+0287   30F0           00882         movlw   0xF0
+0288   00AB           00883         movwf   counter1        
+0289                  00884 smile_in_loop   
+0289   082B           00885         movf    counter1, W
+028A   2???           00886         call    _pwm_values
+028B   00A2           00887         movwf   tooth1
+028C   00A3           00888         movwf   tooth2
+028D   00A4           00889         movwf   tooth3
+028E   00A5           00890         movwf   tooth4
+028F   00A6           00891         movwf   tooth5
+0290   00A7           00892         movwf   tooth6
+0291   3007           00893         movlw   0x07
+0292   2???           00894         call    _delay
+0293   0FAB           00895         incfsz  counter1, F
+0294   2???           00896         goto    smile_in_loop
+                      00897         
+                      00898         ; delay between smile on and eyes on
+0295   2???           00899         call    _CYCLE_LFSR     
+0296   393F           00900         andlw   0x3F
+0297   3801           00901         iorlw   0x01
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 19
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+0298   00A9           00902         movwf   delay_l 
+0299                  00903 smile_in_loop1
+0299   0829           00904         movf    delay_l, W
+029A   1D03           00905         btfss   STATUS, Z
+029B   2???           00906         goto    smile_in_loop1
+                      00907 
+029C   30F0           00908         movlw   0xF0
+029D   00AB           00909         movwf   counter1        
+029E                  00910 eyes_in_loop    
+029E   082B           00911         movf    counter1, W
+029F   2???           00912         call    _pwm_values
+02A0   00A1           00913         movwf   left_eye
+02A1   00A0           00914         movwf   right_eye
+02A2   3007           00915         movlw   0x07
+02A3   2???           00916         call    _delay
+02A4   0FAB           00917         incfsz  counter1, F
+02A5   2???           00918         goto    eyes_in_loop
+                      00919         
+                      00920 
+02A6   2???           00921         goto    MAINLOOP
+                      00922         
+                      00923 ;################################################################################
+                      00924 ; cycle the LFSR generator 8 bits and return the new result in W
+                      00925 ;################################################################################
+02A7                  00926 _CYCLE_LFSR
+02A7   3008           00927         movlw   0x08
+02A8   00B1           00928         movwf   LFSR_count
+02A9                  00929 cycle_lfsr_loop
+                      00930         ; seed register with inial value
+02A9   102C           00931         bcf             temp, 0
+02AA   182D           00932         btfsc   LFSR_0, 0
+02AB   142C           00933         bsf             temp, 0
+                      00934         ; test bit invert result if set
+02AC   192D           00935         btfsc   LFSR_0, 2
+02AD   09AC           00936         comf    temp, f
+                      00937         ; test bit invert result if set
+02AE   1B2D           00938         btfsc   LFSR_0, 6
+02AF   09AC           00939         comf    temp, f
+                      00940         ; test bit invert result if set
+02B0   1BAD           00941         btfsc   LFSR_0, 7
+02B1   09AC           00942         comf    temp, f
+                      00943         
+                      00944         ; set carry bit
+02B2   1003           00945         bcf             STATUS, C
+02B3   182C           00946         btfsc   temp, 0
+02B4   1403           00947         bsf             STATUS, C
+                      00948         
+                      00949         ; rotat the bits 
+02B5   0CB0           00950         rrf             LFSR_3, F
+02B6   0CAF           00951         rrf             LFSR_2, F
+02B7   0CAE           00952         rrf             LFSR_1, F
+02B8   0CAD           00953         rrf             LFSR_0, F
+02B9   0BB1           00954         decfsz  LFSR_count, F
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 20
+
+
+LOC  OBJECT CODE     LINE SOURCE TEXT
+  VALUE
+
+02BA   2???           00955         goto    cycle_lfsr_loop
+02BB   082D           00956         movf    LFSR_0, W
+02BC   0008           00957         return
+                      00958         
+                      00959 ;################################################################################
+02BD                  00960 _delay
+02BD   00AC           00961         movwf   temp
+02BE   019A           00962         clrf    TMR2
+02BF   1091           00963         bcf             PIR1, TMR2IF
+02C0                  00964 delay_loop1
+02C0   1C91           00965         btfss   PIR1, TMR2IF
+02C1   2???           00966         goto    delay_loop1
+02C2   1091           00967         bcf             PIR1, TMR2IF
+02C3   0BAC           00968         decfsz  temp, F
+02C4   2???           00969         goto    delay_loop1
+                      00970         
+02C5   0008           00971         return
+                      00972         
+                      00973 ;################################################################################
+02C6                  00974 _pwm_values
+02C6   390F           00975         andlw   0x0F
+02C7   000B           00976         brw             
+02C8   3400           00977         retlw   0x00
+02C9   3401           00978         retlw   0x01
+02CA   3403           00979         retlw   0x03
+02CB   3407           00980         retlw   0x07
+02CC   340B           00981         retlw   0x0B
+02CD   3412           00982         retlw   0x12
+02CE   341E           00983         retlw   0x1E
+02CF   3428           00984         retlw   0x28
+02D0   3432           00985         retlw   0x32
+02D1   3441           00986         retlw   0x41
+02D2   3450           00987         retlw   0x50
+02D3   3464           00988         retlw   0x64
+02D4   347D           00989         retlw   0x7D
+02D5   34A0           00990         retlw   0xA0
+02D6   34C8           00991         retlw   0xC8
+02D7   34FF           00992         retlw   0xFF
+                      00993         
+02D8   0008           00994         return
+                      00995         
+                      00996         ;### end of program ###
+3F04 37FF             00997         end     
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 21
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+ACKDT                             00000005
+ACKEN                             00000004
+ACKSTAT                           00000006
+ACKTIM                            00000007
+ADCON0                            0000009D
+ADCON1                            0000009E
+ADCON2                            0000009F
+ADFM                              00000007
+ADFVR0                            00000000
+ADFVR1                            00000001
+ADGO                              00000001
+ADIE                              00000006
+ADIF                              00000006
+ADON                              00000000
+ADPREF0                           00000000
+ADPREF1                           00000001
+ADRES                             0000009B
+ADRESH                            0000009C
+ADRESL                            0000009B
+AHEN                              00000001
+ANSA0                             00000000
+ANSA1                             00000001
+ANSA2                             00000002
+ANSA4                             00000004
+ANSC0                             00000000
+ANSC1                             00000001
+ANSC2                             00000002
+ANSC3                             00000003
+ANSELA                            0000018C
+ANSELC                            0000018E
+APFCON                            0000011D
+BCL1IE                            00000003
+BCL1IF                            00000003
+BF                                00000000
+BOEN                              00000004
+BORCON                            00000116
+BORFS                             00000006
+BORRDY                            00000000
+BSR                               00000008
+BSR0                              00000000
+BSR1                              00000001
+BSR2                              00000002
+BSR3                              00000003
+BSR4                              00000004
+BSR_ICDSHAD                       00000FE3
+BSR_SHAD                          00000FE6
+C                                 00000000
+C1HYS                             00000001
+C1IE                              00000005
+C1IF                              00000005
+C1INTN                            00000006
+C1INTP                            00000007
+C1NCH0                            00000000
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 22
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+C1NCH1                            00000001
+C1NCH2                            00000002
+C1OE                              00000005
+C1ON                              00000007
+C1OUT                             00000006
+C1PCH0                            00000004
+C1PCH1                            00000005
+C1POL                             00000004
+C1SP                              00000002
+C1SYNC                            00000000
+C2HYS                             00000001
+C2IE                              00000006
+C2IF                              00000006
+C2INTN                            00000006
+C2INTP                            00000007
+C2NCH0                            00000000
+C2NCH1                            00000001
+C2NCH2                            00000002
+C2OE                              00000005
+C2ON                              00000007
+C2OUT                             00000006
+C2PCH0                            00000004
+C2PCH1                            00000005
+C2POL                             00000004
+C2SP                              00000002
+C2SYNC                            00000000
+CDAFVR0                           00000002
+CDAFVR1                           00000003
+CFGS                              00000006
+CHS0                              00000002
+CHS1                              00000003
+CHS2                              00000004
+CHS3                              00000005
+CHS4                              00000006
+CKE                               00000006
+CKP                               00000004
+CLC1CON                           00000F10
+CLC1GLS0                          00000F14
+CLC1GLS1                          00000F15
+CLC1GLS2                          00000F16
+CLC1GLS3                          00000F17
+CLC1IE                            00000000
+CLC1IF                            00000000
+CLC1POL                           00000F11
+CLC1SEL                           00000001
+CLC1SEL0                          00000F12
+CLC1SEL1                          00000F13
+CLC2CON                           00000F18
+CLC2GLS0                          00000F1C
+CLC2GLS1                          00000F1D
+CLC2GLS2                          00000F1E
+CLC2GLS3                          00000F1F
+CLC2IE                            00000001
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 23
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+CLC2IF                            00000001
+CLC2POL                           00000F19
+CLC2SEL0                          00000F1A
+CLC2SEL1                          00000F1B
+CLCDATA                           00000F0F
+CM1CON0                           00000111
+CM1CON1                           00000112
+CM2CON0                           00000113
+CM2CON1                           00000114
+CMOUT                             00000115
+CODE_VER_STRING                   "Peter Shabino 04Nov18 code for Mad Cat Backpack V1 www.wire2wire.org!"
+CWG1CON0                          00000693
+CWG1CON1                          00000694
+CWG1CON2                          00000695
+CWG1DBF                           00000692
+CWG1DBF0                          00000000
+CWG1DBF1                          00000001
+CWG1DBF2                          00000002
+CWG1DBF3                          00000003
+CWG1DBF4                          00000004
+CWG1DBF5                          00000005
+CWG1DBR                           00000691
+CWG1DBR0                          00000000
+CWG1DBR1                          00000001
+CWG1DBR2                          00000002
+CWG1DBR3                          00000003
+CWG1DBR4                          00000004
+CWG1DBR5                          00000005
+C_SHAD                            00000000
+D1N                               00000000
+D1S0                              00000000
+D1S1                              00000001
+D1S2                              00000002
+D1T                               00000001
+D2N                               00000002
+D2S0                              00000004
+D2S1                              00000005
+D2S2                              00000006
+D2T                               00000003
+D3N                               00000004
+D3S0                              00000000
+D3S1                              00000001
+D3S2                              00000002
+D3T                               00000005
+D4N                               00000006
+D4S0                              00000004
+D4S1                              00000005
+D4S2                              00000006
+D4T                               00000007
+DACCON0                           00000118
+DACCON1                           00000119
+DACEN                             00000007
+DACOE1                            00000005
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 24
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+DACOE2                            00000004
+DACPSS                            00000002
+DACR0                             00000000
+DACR1                             00000001
+DACR2                             00000002
+DACR3                             00000003
+DACR4                             00000004
+DC                                00000001
+DC_SHAD                           00000001
+DHEN                              00000000
+D_NOT_A                           00000005
+F                                 00000001
+FREE                              00000004
+FSR0                              00000004
+FSR0H                             00000005
+FSR0H_SHAD                        00000FE9
+FSR0L                             00000004
+FSR0L_SHAD                        00000FE8
+FSR1                              00000006
+FSR1H                             00000007
+FSR1H_SHAD                        00000FEB
+FSR1L                             00000006
+FSR1L_SHAD                        00000FEA
+FVRCON                            00000117
+FVREN                             00000007
+FVRRDY                            00000006
+G1ARSEN                           00000006
+G1ASDLA0                          00000004
+G1ASDLA1                          00000005
+G1ASDLB0                          00000006
+G1ASDLB1                          00000007
+G1ASDSC1                          00000002
+G1ASDSC2                          00000003
+G1ASDSCLC2                        00000000
+G1ASDSFLT                         00000001
+G1ASE                             00000007
+G1CS0                             00000000
+G1EN                              00000007
+G1IS0                             00000000
+G1IS1                             00000001
+G1IS2                             00000002
+G1OEA                             00000005
+G1OEB                             00000006
+G1POL                             00000000
+G1POLA                            00000003
+G1POLB                            00000004
+G2POL                             00000001
+G3POL                             00000002
+G4D1N                             00000000
+G4D1T                             00000001
+G4D2N                             00000002
+G4D2T                             00000003
+G4D3N                             00000004
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 25
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+G4D3T                             00000005
+G4D4N                             00000006
+G4D4T                             00000007
+G4POL                             00000003
+GCEN                              00000007
+GIE                               00000007
+GO                                00000001
+GO_NOT_DONE                       00000001
+HFIOFR                            00000004
+HFIOFS                            00000000
+INDF0                             00000000
+INDF1                             00000001
+INTCON                            0000000B
+INTE                              00000004
+INTEDG                            00000006
+INTF                              00000001
+IOCAF                             00000393
+IOCAF0                            00000000
+IOCAF1                            00000001
+IOCAF2                            00000002
+IOCAF3                            00000003
+IOCAF4                            00000004
+IOCAF5                            00000005
+IOCAN                             00000392
+IOCAN0                            00000000
+IOCAN1                            00000001
+IOCAN2                            00000002
+IOCAN3                            00000003
+IOCAN4                            00000004
+IOCAN5                            00000005
+IOCAP                             00000391
+IOCAP0                            00000000
+IOCAP1                            00000001
+IOCAP2                            00000002
+IOCAP3                            00000003
+IOCAP4                            00000004
+IOCAP5                            00000005
+IOCIE                             00000003
+IOCIF                             00000000
+IRCF0                             00000003
+IRCF1                             00000004
+IRCF2                             00000005
+IRCF3                             00000006
+IRQ                               0000004B
+IRQ_not_tmr0                      0000008D
+IRQ_not_tmr1                      0000009A
+IRQ_tmr0_done                     0000008A
+IRQ_tmr0_pwm_not_zero             0000006A
+IRQ_tmr1_not_zero                 00000096
+LATA                              0000010C
+LATA0                             00000000
+LATA1                             00000001
+LATA2                             00000002
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 26
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+LATA4                             00000004
+LATA5                             00000005
+LATC                              0000010E
+LATC0                             00000000
+LATC1                             00000001
+LATC2                             00000002
+LATC3                             00000003
+LATC4                             00000004
+LATC5                             00000005
+LC1D1S0                           00000000
+LC1D1S1                           00000001
+LC1D1S2                           00000002
+LC1D2S0                           00000004
+LC1D2S1                           00000005
+LC1D2S2                           00000006
+LC1D3S0                           00000000
+LC1D3S1                           00000001
+LC1D3S2                           00000002
+LC1D4S0                           00000004
+LC1D4S1                           00000005
+LC1D4S2                           00000006
+LC1EN                             00000007
+LC1G1D1N                          00000000
+LC1G1D1T                          00000001
+LC1G1D2N                          00000002
+LC1G1D2T                          00000003
+LC1G1D3N                          00000004
+LC1G1D3T                          00000005
+LC1G1D4N                          00000006
+LC1G1D4T                          00000007
+LC1G1POL                          00000000
+LC1G2D1N                          00000000
+LC1G2D1T                          00000001
+LC1G2D2N                          00000002
+LC1G2D2T                          00000003
+LC1G2D3N                          00000004
+LC1G2D3T                          00000005
+LC1G2D4N                          00000006
+LC1G2D4T                          00000007
+LC1G2POL                          00000001
+LC1G3D1N                          00000000
+LC1G3D1T                          00000001
+LC1G3D2N                          00000002
+LC1G3D2T                          00000003
+LC1G3D3N                          00000004
+LC1G3D3T                          00000005
+LC1G3D4N                          00000006
+LC1G3D4T                          00000007
+LC1G3POL                          00000002
+LC1G4D1N                          00000000
+LC1G4D1T                          00000001
+LC1G4D2N                          00000002
+LC1G4D2T                          00000003
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 27
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+LC1G4D3N                          00000004
+LC1G4D3T                          00000005
+LC1G4D4N                          00000006
+LC1G4D4T                          00000007
+LC1G4POL                          00000003
+LC1INTN                           00000003
+LC1INTP                           00000004
+LC1MODE0                          00000000
+LC1MODE1                          00000001
+LC1MODE2                          00000002
+LC1OE                             00000006
+LC1OUT                            00000005
+LC1POL                            00000007
+LC2D1S0                           00000000
+LC2D1S1                           00000001
+LC2D1S2                           00000002
+LC2D2S0                           00000004
+LC2D2S1                           00000005
+LC2D2S2                           00000006
+LC2D3S0                           00000000
+LC2D3S1                           00000001
+LC2D3S2                           00000002
+LC2D4S0                           00000004
+LC2D4S1                           00000005
+LC2D4S2                           00000006
+LC2EN                             00000007
+LC2G1D1N                          00000000
+LC2G1D1T                          00000001
+LC2G1D2N                          00000002
+LC2G1D2T                          00000003
+LC2G1D3N                          00000004
+LC2G1D3T                          00000005
+LC2G1D4N                          00000006
+LC2G1D4T                          00000007
+LC2G1POL                          00000000
+LC2G2D1N                          00000000
+LC2G2D1T                          00000001
+LC2G2D2N                          00000002
+LC2G2D2T                          00000003
+LC2G2D3N                          00000004
+LC2G2D3T                          00000005
+LC2G2D4N                          00000006
+LC2G2D4T                          00000007
+LC2G2POL                          00000001
+LC2G3D1N                          00000000
+LC2G3D1T                          00000001
+LC2G3D2N                          00000002
+LC2G3D2T                          00000003
+LC2G3D3N                          00000004
+LC2G3D3T                          00000005
+LC2G3D4N                          00000006
+LC2G3D4T                          00000007
+LC2G3POL                          00000002
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 28
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+LC2G4D1N                          00000000
+LC2G4D1T                          00000001
+LC2G4D2N                          00000002
+LC2G4D2T                          00000003
+LC2G4D3N                          00000004
+LC2G4D3T                          00000005
+LC2G4D4N                          00000006
+LC2G4D4T                          00000007
+LC2G4POL                          00000003
+LC2INTN                           00000003
+LC2INTP                           00000004
+LC2MODE0                          00000000
+LC2MODE1                          00000001
+LC2MODE2                          00000002
+LC2OE                             00000006
+LC2OUT                            00000005
+LC2POL                            00000007
+LCEN                              00000007
+LCINTN                            00000003
+LCINTP                            00000004
+LCMODE0                           00000000
+LCMODE1                           00000001
+LCMODE2                           00000002
+LCOE                              00000006
+LCOUT                             00000005
+LFIOFR                            00000001
+LFSR_0                            0000002D
+LFSR_1                            0000002E
+LFSR_2                            0000002F
+LFSR_3                            00000030
+LFSR_count                        00000031
+LWLO                              00000005
+MAINLOOP                          000000CD
+MC1OUT                            00000000
+MC2OUT                            00000001
+MCLC1OUT                          00000000
+MCLC2OUT                          00000001
+N1CKS0                            00000000
+N1CKS1                            00000001
+N1EN                              00000007
+N1OE                              00000006
+N1OUT                             00000005
+N1PFM                             00000000
+N1POL                             00000004
+N1PWS0                            00000005
+N1PWS1                            00000006
+N1PWS2                            00000007
+NCO1ACC                           00000498
+NCO1ACC0                          00000000
+NCO1ACC1                          00000001
+NCO1ACC10                         00000002
+NCO1ACC11                         00000003
+NCO1ACC12                         00000004
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 29
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+NCO1ACC13                         00000005
+NCO1ACC14                         00000006
+NCO1ACC15                         00000007
+NCO1ACC16                         00000000
+NCO1ACC17                         00000001
+NCO1ACC18                         00000002
+NCO1ACC19                         00000003
+NCO1ACC2                          00000002
+NCO1ACC3                          00000003
+NCO1ACC4                          00000004
+NCO1ACC5                          00000005
+NCO1ACC6                          00000006
+NCO1ACC7                          00000007
+NCO1ACC8                          00000000
+NCO1ACC9                          00000001
+NCO1ACCH                          00000499
+NCO1ACCL                          00000498
+NCO1ACCU                          0000049A
+NCO1CLK                           0000049F
+NCO1CON                           0000049E
+NCO1IE                            00000002
+NCO1IF                            00000002
+NCO1INC                           0000049B
+NCO1INC0                          00000000
+NCO1INC1                          00000001
+NCO1INC10                         00000002
+NCO1INC11                         00000003
+NCO1INC12                         00000004
+NCO1INC13                         00000005
+NCO1INC14                         00000006
+NCO1INC15                         00000007
+NCO1INC2                          00000002
+NCO1INC3                          00000003
+NCO1INC4                          00000004
+NCO1INC5                          00000005
+NCO1INC6                          00000006
+NCO1INC7                          00000007
+NCO1INC8                          00000000
+NCO1INC9                          00000001
+NCO1INCH                          0000049C
+NCO1INCL                          0000049B
+NCO1INCU                          0000049D
+NCO1SEL                           00000000
+NOT_BOR                           00000000
+NOT_PD                            00000003
+NOT_POR                           00000001
+NOT_RI                            00000002
+NOT_RMCLR                         00000003
+NOT_RWDT                          00000004
+NOT_T1SYNC                        00000002
+NOT_TO                            00000004
+NOT_WPUEN                         00000007
+OPTION_REG                        00000095
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 30
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+OSCCON                            00000099
+OSCSTAT                           0000009A
+P                                 00000004
+PCIE                              00000006
+PCL                               00000002
+PCLATH                            0000000A
+PCLATH_SHAD                       00000FE7
+PCON                              00000096
+PEIE                              00000006
+PEN                               00000002
+PIE1                              00000091
+PIE2                              00000092
+PIE3                              00000093
+PIR1                              00000011
+PIR2                              00000012
+PIR3                              00000013
+PMADR                             00000191
+PMADRH                            00000192
+PMADRL                            00000191
+PMCON1                            00000195
+PMCON2                            00000196
+PMDAT                             00000193
+PMDATH                            00000194
+PMDATL                            00000193
+POL                               00000007
+PORTA                             0000000C
+PORTC                             0000000E
+PR2                               0000001B
+PS0                               00000000
+PS1                               00000001
+PS2                               00000002
+PSA                               00000003
+PWM1CON                           00000613
+PWM1CON0                          00000613
+PWM1DCH                           00000612
+PWM1DCH0                          00000000
+PWM1DCH1                          00000001
+PWM1DCH2                          00000002
+PWM1DCH3                          00000003
+PWM1DCH4                          00000004
+PWM1DCH5                          00000005
+PWM1DCH6                          00000006
+PWM1DCH7                          00000007
+PWM1DCL                           00000611
+PWM1DCL0                          00000006
+PWM1DCL1                          00000007
+PWM1EN                            00000007
+PWM1OE                            00000006
+PWM1OUT                           00000005
+PWM1POL                           00000004
+PWM2CON                           00000616
+PWM2CON0                          00000616
+PWM2DCH                           00000615
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 31
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+PWM2DCH0                          00000000
+PWM2DCH1                          00000001
+PWM2DCH2                          00000002
+PWM2DCH3                          00000003
+PWM2DCH4                          00000004
+PWM2DCH5                          00000005
+PWM2DCH6                          00000006
+PWM2DCH7                          00000007
+PWM2DCL                           00000614
+PWM2DCL0                          00000006
+PWM2DCL1                          00000007
+PWM2EN                            00000007
+PWM2OE                            00000006
+PWM2OUT                           00000005
+PWM2POL                           00000004
+PWM3CON                           00000619
+PWM3CON0                          00000619
+PWM3DCH                           00000618
+PWM3DCH0                          00000000
+PWM3DCH1                          00000001
+PWM3DCH2                          00000002
+PWM3DCH3                          00000003
+PWM3DCH4                          00000004
+PWM3DCH5                          00000005
+PWM3DCH6                          00000006
+PWM3DCH7                          00000007
+PWM3DCL                           00000617
+PWM3DCL0                          00000006
+PWM3DCL1                          00000007
+PWM3EN                            00000007
+PWM3OE                            00000006
+PWM3OUT                           00000005
+PWM3POL                           00000004
+PWM4CON                           0000061C
+PWM4CON0                          0000061C
+PWM4DCH                           0000061B
+PWM4DCH0                          00000000
+PWM4DCH1                          00000001
+PWM4DCH2                          00000002
+PWM4DCH3                          00000003
+PWM4DCH4                          00000004
+PWM4DCH5                          00000005
+PWM4DCH6                          00000006
+PWM4DCH7                          00000007
+PWM4DCL                           0000061A
+PWM4DCL0                          00000006
+PWM4DCL1                          00000007
+PWM4EN                            00000007
+PWM4OE                            00000006
+PWM4OUT                           00000005
+PWM4POL                           00000004
+PWM_DELAY                         0000007D
+RA0                               00000000
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 32
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+RA1                               00000001
+RA2                               00000002
+RA3                               00000003
+RA4                               00000004
+RA5                               00000005
+RC0                               00000000
+RC1                               00000001
+RC2                               00000002
+RC3                               00000003
+RC4                               00000004
+RC5                               00000005
+RCEN                              00000003
+RD                                00000000
+RSEN                              00000001
+R_NOT_W                           00000002
+S                                 00000003
+SBCDE                             00000002
+SBOREN                            00000007
+SCIE                              00000005
+SCS0                              00000000
+SCS1                              00000001
+SDAHT                             00000003
+SDOSEL                            00000005
+SEN                               00000000
+SMP                               00000007
+SSP1ADD                           00000212
+SSP1BUF                           00000211
+SSP1CON1                          00000215
+SSP1CON2                          00000216
+SSP1CON3                          00000217
+SSP1IE                            00000003
+SSP1IF                            00000003
+SSP1MSK                           00000213
+SSP1STAT                          00000214
+SSPADD                            00000212
+SSPBUF                            00000211
+SSPCON                            00000215
+SSPCON1                           00000215
+SSPCON2                           00000216
+SSPCON3                           00000217
+SSPEN                             00000005
+SSPM0                             00000000
+SSPM1                             00000001
+SSPM2                             00000002
+SSPM3                             00000003
+SSPMSK                            00000213
+SSPOV                             00000006
+SSPSTAT                           00000214
+SSSEL                             00000004
+START                             0000009B
+START_ANIMATION                   00000287
+STATUS                            00000003
+STATUS_SHAD                       00000FE4
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 33
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+STKOVF                            00000007
+STKPTR                            00000FED
+STKUNF                            00000006
+SWDTEN                            00000000
+T0CS                              00000005
+T0IE                              00000005
+T0IF                              00000002
+T0SE                              00000004
+T1CKPS0                           00000004
+T1CKPS1                           00000005
+T1CON                             00000018
+T1GCON                            00000019
+T1GGO_NOT_DONE                    00000003
+T1GPOL                            00000006
+T1GSEL                            00000003
+T1GSPM                            00000004
+T1GSS0                            00000000
+T1GSS1                            00000001
+T1GTM                             00000005
+T1GVAL                            00000002
+T1OSCEN                           00000003
+T2CKPS0                           00000000
+T2CKPS1                           00000001
+T2CON                             0000001C
+T2OUTPS0                          00000003
+T2OUTPS1                          00000004
+T2OUTPS2                          00000005
+T2OUTPS3                          00000006
+TMR0                              00000015
+TMR0CS                            00000005
+TMR0IE                            00000005
+TMR0IF                            00000002
+TMR0SE                            00000004
+TMR1                              00000016
+TMR1CS0                           00000006
+TMR1CS1                           00000007
+TMR1GE                            00000007
+TMR1GIE                           00000007
+TMR1GIF                           00000007
+TMR1H                             00000017
+TMR1IE                            00000000
+TMR1IF                            00000000
+TMR1L                             00000016
+TMR1ON                            00000000
+TMR2                              0000001A
+TMR2IE                            00000001
+TMR2IF                            00000001
+TMR2ON                            00000002
+TOSH                              00000FEF
+TOSL                              00000FEE
+TRIGSEL0                          00000004
+TRIGSEL1                          00000005
+TRIGSEL2                          00000006
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 34
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+TRIGSEL3                          00000007
+TRISA                             0000008C
+TRISA0                            00000000
+TRISA1                            00000001
+TRISA2                            00000002
+TRISA3                            00000003
+TRISA4                            00000004
+TRISA5                            00000005
+TRISC                             0000008E
+TRISC0                            00000000
+TRISC1                            00000001
+TRISC2                            00000002
+TRISC3                            00000003
+TRISC4                            00000004
+TRISC5                            00000005
+TSEN                              00000005
+TSRNG                             00000004
+UA                                00000001
+VREGCON                           00000197
+VREGPM                            00000001
+W                                 00000000
+WCOL                              00000007
+WDTCON                            00000097
+WDTPS0                            00000001
+WDTPS1                            00000002
+WDTPS2                            00000003
+WDTPS3                            00000004
+WDTPS4                            00000005
+WPUA                              0000020C
+WPUA0                             00000000
+WPUA1                             00000001
+WPUA2                             00000002
+WPUA3                             00000003
+WPUA4                             00000004
+WPUA5                             00000005
+WR                                00000001
+WREG                              00000009
+WREG_SHAD                         00000FE5
+WREN                              00000002
+WRERR                             00000003
+Z                                 00000002
+Z_SHAD                            00000002
+_BOREN_NSLEEP                     00003DFF
+_BOREN_OFF                        000039FF
+_BOREN_ON                         00003FFF
+_BOREN_SBODEN                     00003BFF
+_BORV_HI                          00003BFF
+_BORV_LO                          00003FFF
+_CLKOUTEN_OFF                     00003FFF
+_CLKOUTEN_ON                      000037FF
+_CONFIG1                          00008007
+_CONFIG2                          00008008
+_CP_OFF                           00003FFF
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 35
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+_CP_ON                            00003F7F
+_CYCLE_LFSR                       000002A7
+_DEVID1                           00008006
+_FOSC_ECH                         00003FFF
+_FOSC_ECL                         00003FFD
+_FOSC_ECM                         00003FFE
+_FOSC_INTOSC                      00003FFC
+_IDLOC0                           00008000
+_IDLOC1                           00008001
+_IDLOC2                           00008002
+_IDLOC3                           00008003
+_LPBOR_OFF                        00003FFF
+_LPBOR_ON                         000037FF
+_LVP_OFF                          00001FFF
+_LVP_ON                           00003FFF
+_MCLRE_OFF                        00003FBF
+_MCLRE_ON                         00003FFF
+_PWRTE_OFF                        00003FFF
+_PWRTE_ON                         00003FDF
+_STVREN_OFF                       00003DFF
+_STVREN_ON                        00003FFF
+_WDTE_NSLEEP                      00003FF7
+_WDTE_OFF                         00003FE7
+_WDTE_ON                          00003FFF
+_WDTE_SWDTEN                      00003FEF
+_WRT_ALL                          00003FFC
+_WRT_BOOT                         00003FFE
+_WRT_HALF                         00003FFD
+_WRT_OFF                          00003FFF
+__16F1503                         00000001
+_delay                            000002BD
+_pwm_values                       000002C6
+animation_blink                   00000248
+animation_eye_bobble              0000018E
+animation_lip_lick_left           000001FE
+animation_lip_lick_right          00000223
+animation_lip_piano               000001B9
+animation_smile_in_out            0000025A
+animation_sparkles                000000F6
+animation_talk                    00000121
+blink_ok                          00000252
+counter1                          0000002B
+counter2                          00000032
+cycle_lfsr_loop                   000002A9
+delay_h                           0000002A
+delay_l                           00000029
+delay_loop1                       000002C0
+eye_bobble_loop                   00000192
+eye_bobble_loop1                  00000194
+eye_bobble_loop2                  0000019D
+eye_bobble_loop3                  000001A6
+eye_bobble_loop4                  000001AF
+eye_out_loop                      0000025C
+MPASM 5.81           MAD_CAT_BACKPACK_V0.ASM   11-4-2018  18:16:35         PAGE 36
+
+
+SYMBOL TABLE
+  LABEL                             VALUE 
+
+eye_out_loop1                     0000026A
+eyes_in_loop                      0000029E
+left_eye                          00000021
+mainloop_delay                    000000CF
+piano_in_loop                     000001C8
+piano_in_loop1                    000001DC
+piano_in_loop2                    000001F2
+piano_loop                        000001CF
+piano_out_loop                    000001BF
+piano_out_loop1                   000001D1
+piano_out_loop2                   000001E7
+pwm_cnt                           00000028
+right_eye                         00000020
+smile_in_loop                     00000289
+smile_in_loop1                    00000299
+smile_out_loop                    0000026F
+smile_out_loop1                   00000284
+sparkles_loop                     000000F8
+talk_delay                        0x03
+talk_loop                         00000125
+talk_loop1                        00000127
+talk_loop2                        00000135
+talk_loop3                        00000149
+talk_loop4                        00000154
+talk_loop5                        00000162
+talk_loop6                        0000017A
+temp                              0000002C
+tooth1                            00000022
+tooth2                            00000023
+tooth3                            00000024
+tooth4                            00000025
+tooth5                            00000026
+tooth6                            00000027
+
+Errors   :     0
+Warnings :     0 reported,     0 suppressed
+Messages :     9 reported,     0 suppressed
+
+
