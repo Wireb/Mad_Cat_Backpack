@@ -20,7 +20,7 @@ Animations are NOT weighted evenly. Blinking has a higher probability then the o
 Total code space use is ~36% so plenty of space for more animations if wanted. 
 
 **NOTE** 
-- When running off 5V power the LEDs are boarder line too bright. Replace the 200 ohm resistors with a larger value to reduce brightness.
+- When running off 5V power the LEDs are borderline too bright. Replace the 200 ohm resistors with a larger value to reduce brightness.
 
 ## KiCad
 This is a KiCad 5.0 project. 
